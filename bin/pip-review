@@ -37,7 +37,21 @@ try:
 except (ImportError, AttributeError):
     pass
 
-from pip._vendor.packaging import version as packaging_version
+
+try:
+    from pip._vendor.packaging import version as packaging_version
+    version_order_key = packaging_version.parse
+    version_is_prerelease = lambda v: packaging_version.parse(v).is_prerelease
+except ImportError:
+    # Compatibility for pip version < 6.0
+    from pip._vendor.distlib import version as packaging_version
+    from pip.util import is_prerelease as version_is_prerelease
+
+    def version_order_key(version):
+        suggested = packaging_version._suggest_normalized_version(version)
+        if suggested is not None:
+            return suggested
+        return packaging_version._suggest_semantic_version(version)
 
 
 def parse_args():
@@ -132,12 +146,11 @@ def latest_version(pkg_name, prerelease=False, silent=False):
         versions = [
             v for v in sorted(
                 list(info['releases']),
-                key=packaging_version.parse
+                key=version_order_key
             )
         ]
         if not prerelease:
-            versions = [v for v in versions
-                        if not packaging_version.parse(v).is_prerelease]
+            versions = [v for v in versions if not version_is_prerelease(v)]
         version = versions[-1]
     except IndexError:
         return None, None
