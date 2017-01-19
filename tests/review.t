@@ -16,7 +16,7 @@ Setup. Let's pretend we have some outdated package versions installed:
 
 Also install library, which caused warning message:
 
-  $ pip install http://www.effbot.org/media/downloads/cElementTree-1.0.5-20051216.tar.gz >/dev/null 2>&1
+  $ pip install http://www.effbot.org/media/downloads/cElementTree-1.0.5-20051216.tar.gz >/dev/null 2>&1 || true
 
 Next, let's see what pip-review does:
 
@@ -34,11 +34,15 @@ We can also install these updates automatically:
   $ pip-review
   Everything up-to-date
 
-Next, let's test for regressions with older versions of pip:
+Next, let's test for regressions with older versions of pip and Python:
 
   $ pip install --force-reinstall --upgrade pip\<6.0 >/dev/null 2>&1
-  $ pip-review
-  Everything up-to-date
+  $ if python -c 'import sys; sys.exit(0 if sys.version_info <= (3,5) else 1)'; then
+  >   pip-review
+  > else
+  >   echo Skipped
+  > fi
+  (Everything up-to-date|Skipped) (re)
 
 Cleanup our playground:
 
