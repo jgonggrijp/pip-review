@@ -86,6 +86,9 @@ def parse_args():
     parser.add_argument(
         '--freeze-outdated-packages', action='store_true', default=False,
         help='Freeze all outdated packages to "requirements.txt" before upgrading them')
+    parser.add_argument(
+        '--tabulated', '-t', action='store_true', default=False,
+        help='Print the outdated packages in tabbular format')
     return parser.parse_known_args()
 
 
@@ -245,6 +248,20 @@ def main():
     elif args.raw:
         for pkg in outdated:
             logger.info('{0}=={1}'.format(pkg['name'], pkg['latest_version']))
+    elif args.tabulated:
+        selected = []
+        logger.info('{:30}{:20}{:20}'.format('name','latest version','version'))
+        logger.info('{:30}{:20}{:20}'.format('-'*29,'-'*19,'-'*19))
+        for pkg in outdated:
+            logger.info('{:30}{:20}{:20}'.format(
+                pkg['name'], pkg['latest_version'], pkg['version']
+            ))
+            if args.interactive:
+                answer = ask_to_install()
+                if answer in ['y', 'a']:
+                    selected.append(pkg)
+        if selected:
+            update_packages(selected, install_args, args.continue_on_fail, args.freeze_outdated_packages)
     else:
         selected = []
         for pkg in outdated:
