@@ -175,6 +175,14 @@ class InteractiveAsker(object):
 
 ask_to_install = partial(InteractiveAsker().ask, prompt='Upgrade now?')
 
+def get_pinned_packages(constraint_file):
+    pinned_packages = []
+    if os.path.isfile(constraint_file):
+        with open(constraint_file, "r") as f:
+            for line in f:
+                if "==" in line:
+                    pinned_packages.append(line.split("==")[0].strip())
+    return pinned_packages
 
 def update_packages(packages, forwarded, continue_on_fail, freeze_outdated_packages):
     upgrade_cmd = pip_cmd() + ['install', '-U'] + forwarded
@@ -272,6 +280,9 @@ def format_table(columns):
 
 
 def main():
+    constraint_file = os.environ.get("PIP_CONSTRAINT", "")
+    pinned_packages = get_pinned_packages(constraint_file)
+    
     args, forwarded = parse_args()
     list_args = filter_forwards(forwarded, INSTALL_ONLY)
     install_args = filter_forwards(forwarded, LIST_ONLY)
@@ -298,8 +309,10 @@ def main():
 
     selected = []
     for pkg in outdated:
-        logger.info('{0}=={1} is available (you have {2})'.format(
-            pkg['name'], pkg['latest_version'], pkg['version']
+        pinned_text = " [Pinned]" if pkg["name"] in pinned_packages else ""
+        logger.info(
+            "{0}=={1} is available (you have {2}){3}".format(
+                pkg["name"], pkg["latest_version"], pkg["version"], pinned_text
         ))
         if args.interactive:
             answer = ask_to_install()
