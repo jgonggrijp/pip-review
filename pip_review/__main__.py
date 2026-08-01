@@ -8,6 +8,7 @@ import subprocess
 import sys
 from functools import partial
 from operator import itemgetter
+from os import environ as os_environ
 
 import pip
 from packaging import version
@@ -87,7 +88,9 @@ VERSION_EPILOG = DEPRECATED_NOTICE if (2, 7) > sys.version_info >= (3, 3) else '
 
 
 def parse_args():
-    description = 'Keeps your Python packages fresh. Looking for a new maintainer! See https://github.com/jgonggrijp/pip-review/issues/76'
+    description = 'Keeps your Python packages fresh. \
+                   Looking for a new maintainer! \
+                   See https://github.com/jgonggrijp/pip-review/issues/76'
     parser = argparse.ArgumentParser(
         description=description,
         epilog=EPILOG + VERSION_EPILOG,
@@ -179,7 +182,8 @@ class InteractiveAsker(object):
 
         answer = ''
         while answer not in ['y', 'n', 'a', 'q']:
-            question_last='{0} [Y]es, [N]o, [A]ll, [Q]uit ({1}) '.format(prompt, self.last_answer)
+            question_last='{0} [Y]es, [N]o, [A]ll, [Q]uit ({1}) '\
+                .format(prompt, self.last_answer)
             question_default='{0} [Y]es, [N]o, [A]ll, [Q]uit '.format(prompt)
             answer = input(question_last if self.last_answer else question_default)
             answer = answer.strip().lower()
@@ -193,6 +197,32 @@ class InteractiveAsker(object):
 
 
 ask_to_install = partial(InteractiveAsker().ask, prompt='Upgrade now?')
+
+
+def get_constraint_filename(list_args):
+    # TODO: Obtain from cmdline arg "-c, --constraint"  just like pip?
+    # Q: Which takes precedence : env var or cmdline? Standard would be
+    # cmdline arg has precedence, so let's check that first and fall
+    # back to env var if needed
+    # Something like: if list_args.constraint: ... else: env.get() ...
+    return os_environ.get("PIP_CONSTRAINT", "")
+
+
+def get_constrained_packages(constraint_file):
+    # TODO: we could probably pass this to PIP_CMD instead? I need to check.
+    constrained_packages = []
+    # open() will throw exception if "constraint_file" is not a readable file
+    # It is a user-supplied param so we should at least log if there is an issue
+    # Allow exceptions to propgate from here and catch at point-of-call
+    with open(constraint_file, "r") as f:
+        for line in f:
+            line.strip()
+            # '#' at begin of line is a comment line in constraints file
+            # It would be a nasty bug if someone commented-out a constraint
+            # line but we included it anyway...
+            if not line.startswith("#") and "==" in line:
+                constrained_packages.append(line.split("==")[0].strip())
+    return constrained_packages
 
 
 def update_packages(packages, forwarded, continue_on_fail, freeze_outdated_packages):
@@ -290,6 +320,17 @@ def main():
     if args.raw and args.interactive:
         raise SystemExit('--raw and --interactive cannot be used together')
 
+    constrained_packages = []
+    constraint_filename = get_constraint_filename(list_args)
+    try:
+        constrained_packages = get_constrained_packages(constraint_filename)
+    except FileNotFoundError:
+        logger.warning("The constraint file \"{0}\" was not found."\
+                       .format(constraint_filename))
+    except IOError:
+        logger.warning("Constraint file \"{0}\" could not be read."\
+                       .format(constraint_filename))
+
     outdated = get_outdated_packages(list_args)
     if not outdated and not args.raw:
         logger.info('Everything up-to-date')
@@ -299,25 +340,40 @@ def main():
         if args.preview_only:
             return
     if args.auto:
-        update_packages(outdated, install_args, args.continue_on_fail, args.freeze_outdated_packages)
+        update_packages(outdated,
+                        install_args,
+                        args.continue_on_fail,
+                        args.freeze_outdated_packages)
         return
     if args.raw:
-        for pkg in outdated:
-            logger.info('{0}=={1}'.format(pkg['name'], pkg['latest_version']))
+        if not outdated:
+            logger.info('Everything up-to-date')
+        else:
+            for pkg in outdated:
+                logger.info('{0}=={1}'\
+                            .format(pkg['name'], pkg['latest_version']))
         return
 
     selected = []
     for pkg in outdated:
-        logger.info('{0}=={1} is available (you have {2})'.format(
-            pkg['name'], pkg['latest_version'], pkg['version']
-        ))
+        msg = "{0}=={1} is available (you have {2}"
+        if pkg["name"] in constrained_packages:
+            msg = msg + ", constrained)."
+        else:
+            msg = msg + ').'
+        logger.info(msg.format(pkg["name"],
+                               pkg["latest_version"],
+                               pkg["version"]))
+
         if args.interactive:
             answer = ask_to_install()
             if answer in ['y', 'a']:
                 selected.append(pkg)
     if selected:
-        update_packages(selected, install_args, args.continue_on_fail, args.freeze_outdated_packages)
-
+        update_packages(selected,
+                        install_args,
+                        args.continue_on_fail,
+                        args.freeze_outdated_packages)
 
 if __name__ == '__main__':
     try:
