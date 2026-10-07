@@ -63,7 +63,7 @@ INSTALL_ONLY = {
     'ignore-installed', 'ignore-requires-python', 'implementation',
     'install-option', 'no-binary', 'no-build-isolation', 'no-clean',
     'no-compile', 'no-dependencies', 'no-deps', 'no-require-hashes', 'no-user',
-    'no-warn-conflicts', 'no-warn-script-location', 'only-binary',
+    'no-warn-conflicts', 'no-warn-script-location',
     'only-dependencies', 'only-deps', 'platform', 'prefer-binary', 'prefix',
     'progress-bar', 'python-version', 'r', 'report', 'require-hashes',
     'requirement', 'requirements-from-script', 'root', 'root-user-action',

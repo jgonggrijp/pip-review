@@ -31,6 +31,15 @@ pip-review forwards arguments it doesn't recognize to pip:
   $ pip-review --timeout 30 2>&1 | egrep -v '^DEPRECATION:'
   python-dateutil==* is available (you have 1.5) (glob)
 
+The --only-binary value is forwarded to pip list as well as pip install:
+
+  $ python - <<'PY'
+  > from pip_review.__main__ import INSTALL_ONLY, LIST_ONLY, filter_forwards
+  > args = ['--only-binary', ':all:']
+  > assert filter_forwards(args, INSTALL_ONLY) == args
+  > assert filter_forwards(args, LIST_ONLY) == args
+  > PY
+
 It only fails if pip doesn't recognize it either:
 
   $ pip-review --bananas >/dev/null 2>&1
