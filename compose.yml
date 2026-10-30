@@ -1,0 +1,19 @@
+services:
+  py27: &py
+    image: python:2.7
+    volumes:
+      - ./:/usr/src/pip-review
+    working_dir: /usr/src/pip-review
+    command: ./run-tests-OCI.sh
+  py34:
+    <<: *py
+    image: python:3.4
+  py36:
+    <<: *py
+    image: python:3.6
+  py310:
+    <<: *py
+    image: python:3.10
+  py314:
+    <<: *py
+    image: python:3.14
