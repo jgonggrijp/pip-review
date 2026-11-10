@@ -88,9 +88,16 @@ VERSION_EPILOG = DEPRECATED_NOTICE if (2, 7) > sys.version_info >= (3, 3) else '
 
 def parse_args():
     description = 'Keeps your Python packages fresh. Looking for a new maintainer! See https://github.com/jgonggrijp/pip-review/issues/76'
+    kwargs = {}
+    if sys.version_info >= (3, 5):
+        # Without this, argparse treats unrecognised options that happen to be
+        # prefixes of our own (e.g. --pre for --preview) as abbreviations
+        # instead of forwarding them to pip.
+        kwargs['allow_abbrev'] = False
     parser = argparse.ArgumentParser(
         description=description,
         epilog=EPILOG + VERSION_EPILOG,
+        **kwargs
     )
     parser.add_argument(
         '--verbose', '-v', action='store_true', default=False,
