@@ -10,7 +10,7 @@ branches:
 install:
   - "pip install -U setuptools pip wheel"
   - "pip install cram"
-  - "pip install pytest"
+  - "pip install pytest pytest-mock"
   - "pip install ."
 script:
   - "python -m pytest tests"
