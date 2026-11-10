@@ -68,7 +68,10 @@ It also recognises options that have their value attached with an equals sign:
   $ python - <<'PY'
   > from pip_review.__main__ import INSTALL_ONLY, LIST_ONLY, filter_forwards
   > assert filter_forwards(['--constraint=c.txt'], INSTALL_ONLY) == []
+  > assert filter_forwards(['--constraint=c.txt'], LIST_ONLY) == [
+  >     '--constraint=c.txt']
   > assert filter_forwards(['--exclude=foo'], LIST_ONLY) == []
+  > assert filter_forwards(['--exclude=foo'], INSTALL_ONLY) == ['--exclude=foo']
   > assert filter_forwards(['--timeout=30'], LIST_ONLY) == ['--timeout=30']
   > assert filter_forwards(['--timeout=30', 'x'], INSTALL_ONLY) == [
   >     '--timeout=30']
