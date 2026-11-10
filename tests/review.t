@@ -63,6 +63,21 @@ It knows that --break-system-packages only applies to pip install:
   $ pip install python-dateutil==1.5 >/dev/null 2>&1
   $ pip-review --auto --break-system-packages >/dev/null 2>&1
 
+It does not mistake pip options for abbreviations of its own options:
+
+  $ python - <<'PY'
+  > import sys
+  > from pip_review.__main__ import parse_args
+  > if sys.version_info >= (3, 5):
+  >     sys.argv = ['pip-review', '--pre', '--preview']
+  >     args, forwarded = parse_args()
+  >     assert args.preview and forwarded == ['--pre']
+  > PY
+  $ pip install python-dateutil==1.5 >/dev/null 2>&1
+  $ if python -c 'import sys; sys.exit(0 if sys.version_info >= (3, 5) else 1)'; then
+  >   pip-review --auto --pre >/dev/null 2>&1
+  > fi
+
 Next, let's test for regressions with older versions of pip:
 
   $ pip install --force-reinstall --upgrade pip\<6.0 >/dev/null 2>&1
