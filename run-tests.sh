@@ -1,4 +1,4 @@
 #!/bin/sh
 set -e
-python -m unittest discover -s tests
+python -m pytest tests
 cram --shell=/bin/bash tests/*.t

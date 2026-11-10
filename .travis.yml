@@ -10,8 +10,8 @@ branches:
 install:
   - "pip install -U setuptools pip wheel"
   - "pip install cram"
-  - "if python --version 2>&1 | grep -q 'Python 2'; then pip install mock; fi"
+  - "pip install pytest"
   - "pip install ."
 script:
-  - "python -m unittest discover -s tests"
+  - "python -m pytest tests"
   - "cram --shell=/bin/bash tests/*.t"
