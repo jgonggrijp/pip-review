@@ -74,7 +74,9 @@ It does not mistake pip options for abbreviations of its own options:
   >     assert args.preview and forwarded == ['--pre']
   > PY
   $ pip install python-dateutil==1.5 >/dev/null 2>&1
-  $ pip-review --auto --pre >/dev/null 2>&1
+  $ if python -c 'import sys; sys.exit(0 if sys.version_info >= (3, 5) else 1)'; then
+  >   pip-review --auto --pre >/dev/null 2>&1
+  > fi
 
 Next, let's test for regressions with older versions of pip:
 
