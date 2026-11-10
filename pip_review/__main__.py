@@ -137,11 +137,12 @@ def filter_forwards(args, exclude):
             # assume this belongs with the previous argument.
             if admitted:
                 result.append(arg)
-        elif arg.lstrip('-') in exclude:
+        elif arg.lstrip('-').split('=', 1)[0] in exclude:
             admitted = False
         else:
             result.append(arg)
-            admitted = True
+            # a value attached with '=' is already part of this argument.
+            admitted = '=' not in arg
     return result
 
 
