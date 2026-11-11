@@ -217,10 +217,10 @@ def outdated_with(mocker):
     output. The function returns the parsed packages and the ``pip list``
     command that was run.
     """
-    def run(pip_version, output):
+    def run(pip_version, output, uv=False):
         mocker.patch.object(pr.pip, '__version__', pip_version)
         fake = mocker.patch.object(pr, 'check_output', return_value=output)
-        packages = pr.get_outdated_packages(['--user'])
+        packages = pr.get_outdated_packages(['--user'], uv=uv)
         return packages, fake.call_args[0][0]
     return run
 
@@ -255,6 +255,15 @@ def test_very_old_pip_has_no_version_check_flag(outdated_with):
     assert '--disable-pip-version-check' not in command
 
 
+def test_uv_lists_with_uv_pip_and_json(outdated_with):
+    packages, command = outdated_with(
+        '8.1.2', b'[{"name": "a", "version": "1", "latest_version": "2"}]',
+        uv=True)
+    assert packages[0]['latest_version'] == '2'
+    assert command == pr.UV_CMD + [
+        'list', '--outdated', '--format=json', '--user']
+
+
 # update_packages
 
 PACKAGES = [{'name': 'a', 'version': '1'}, {'name': 'b', 'version': '2'}]
@@ -277,6 +286,14 @@ def pip_calls(mocker, monkeypatch, tmpdir):
 def test_single_install_of_all_packages(pip_calls):
     pr.update_packages(PACKAGES, ['--user'], False, False)
     assert pip_calls == [['install', '-U', '--user', 'a', 'b']]
+
+
+def test_uv_installs_with_uv_pip(mocker, monkeypatch, tmpdir):
+    monkeypatch.chdir(str(tmpdir))
+    call = mocker.patch.object(pr.subprocess, 'call')
+    pr.update_packages(PACKAGES, ['--system'], False, False, uv=True)
+    assert call.call_args[0][0] == pr.UV_CMD + [
+        'install', '-U', '--system', 'a', 'b']
 
 
 def test_continue_on_fail_installs_one_by_one(pip_calls):
@@ -344,6 +361,7 @@ FLAGS = {
     'preview': '-p',
     'preview_only': '-P',
     'freeze_outdated_packages': '--freeze-outdated-packages',
+    'uv': '--uv',
 }
 
 
@@ -406,6 +424,12 @@ def run_main(mocker, monkeypatch):
     return run
 
 
+def test_main_passes_uv_on(run_main):
+    result = run_main('--uv', '--auto')
+    result.get.assert_called_once_with([], uv=True)
+    result.update.assert_called_once_with(OUTDATED, [], False, False, uv=True)
+
+
 def test_main_up_to_date(run_main):
     result = run_main(outdated=[])
     assert result.lines == ['Everything up-to-date']
@@ -445,7 +469,8 @@ def test_main_preview_shows_table_then_lists(run_main):
 
 def test_main_auto_installs_everything(run_main):
     result = run_main('--auto')
-    result.update.assert_called_once_with(OUTDATED, [], False, False)
+    result.update.assert_called_once_with(
+        OUTDATED, [], False, False, uv=False)
 
 
 def test_main_auto_passes_options_through(run_main):
@@ -454,14 +479,16 @@ def test_main_auto_passes_options_through(run_main):
         '--user', '--force-reinstall', '--not-required')
     # install-only options do not reach `pip list`, list-only ones do not
     # reach `pip install`
-    result.get.assert_called_once_with(['--user', '--not-required'])
+    result.get.assert_called_once_with(
+        ['--user', '--not-required'], uv=False)
     result.update.assert_called_once_with(
-        OUTDATED, ['--user', '--force-reinstall'], True, True)
+        OUTDATED, ['--user', '--force-reinstall'], True, True, uv=False)
 
 
 def test_main_interactive_installs_selected_only(run_main):
     result = run_main('--interactive', answers=['y', 'n'])
-    result.update.assert_called_once_with(OUTDATED[:1], [], False, False)
+    result.update.assert_called_once_with(
+        OUTDATED[:1], [], False, False, uv=False)
 
 
 def test_main_interactive_answer_all(run_main):
@@ -469,7 +496,8 @@ def test_main_interactive_answer_all(run_main):
     # the later questions itself, but ask_to_install is mocked here, so it
     # needs one answer per package.
     result = run_main('-i', answers=['a', 'a'])
-    result.update.assert_called_once_with(OUTDATED, [], False, False)
+    result.update.assert_called_once_with(
+        OUTDATED, [], False, False, uv=False)
 
 
 def test_main_interactive_nothing_selected(run_main):

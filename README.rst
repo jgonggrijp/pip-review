@@ -25,6 +25,14 @@ Example, actually install everything:
     $ pip-review --auto
     ... <pip install output>
 
+Example, use `uv <https://docs.astral.sh/uv/>`_ instead of pip. This runs
+``uv pip list --outdated`` and ``uv pip install``, so ``uv`` has to be
+installed. Options such as ``--system`` are forwarded to uv:
+
+.. code:: console
+
+    $ pip-review --uv --auto --system
+
 Example, run interactively, ask to upgrade for each package:
 
 .. code:: console
