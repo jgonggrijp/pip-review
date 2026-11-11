@@ -5,7 +5,7 @@
 pip-review
 ==========
 
-*Looking for a new maintainer! See https://github.com/jgonggrijp/pip-review/issues/76.*
+Maintained by `Julian Gonggrijp <https://github.com/jgonggrijp>`_ and `Srinivas Chippagiri <https://github.com/cvas22>`_.
 
 ``pip-review`` is a convenience wrapper around ``pip``. It can list available updates by deferring to ``pip list --outdated``. It can also automatically or interactively install available updates for you by deferring to ``pip install``.
 
