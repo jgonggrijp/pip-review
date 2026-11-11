@@ -73,6 +73,7 @@ INSTALL_ONLY = {
 
 # command that sets up the pip module of the current Python interpreter
 PIP_CMD = [sys.executable, '-m', 'pip']
+UV_CMD = ['uv', 'pip']
 
 # nicer headings for the columns in the oudated package table
 COLUMNS = {
@@ -117,6 +118,9 @@ def parse_args():
     parser.add_argument(
         '--freeze-outdated-packages', action='store_true', default=False,
         help='Freeze all outdated packages to "requirements.txt" before upgrading them')
+    parser.add_argument(
+        '--uv', action='store_true', default=False,
+        help='Use "uv pip" instead of pip to list and install updates')
     parser.add_argument(
         '--preview', '-p', action='store_true', default=False,
         help='Preview update target list before execution')
@@ -203,8 +207,11 @@ class InteractiveAsker(object):
 ask_to_install = partial(InteractiveAsker().ask, prompt='Upgrade now?')
 
 
-def update_packages(packages, forwarded, continue_on_fail, freeze_outdated_packages):
-    upgrade_cmd = PIP_CMD + ['install', '-U'] + forwarded
+def update_packages(
+        packages, forwarded, continue_on_fail, freeze_outdated_packages,
+        uv=False):
+    tool = UV_CMD if uv else PIP_CMD
+    upgrade_cmd = tool + ['install', '-U'] + forwarded
 
     if freeze_outdated_packages:
         with open('requirements.txt', 'w') as f:
@@ -246,7 +253,11 @@ def parse_legacy(pip_output):
     return packages
 
 
-def get_outdated_packages(forwarded):
+def get_outdated_packages(forwarded, uv=False):
+    if uv:
+        # uv has no pip version check and always supports JSON output.
+        command = UV_CMD + ['list', '--outdated', '--format=json'] + forwarded
+        return json.loads(check_output(command).decode('utf-8'))
     command = PIP_CMD + ['list', '--outdated'] + forwarded
     pip_version = version.parse(pip.__version__)
     if pip_version >= version.parse('6.0'):
@@ -298,7 +309,7 @@ def main():
     if args.raw and args.interactive:
         raise SystemExit('--raw and --interactive cannot be used together')
 
-    outdated = get_outdated_packages(list_args)
+    outdated = get_outdated_packages(list_args, uv=args.uv)
     if not outdated and not args.raw:
         logger.info('Everything up-to-date')
         return
@@ -307,7 +318,9 @@ def main():
         if args.preview_only:
             return
     if args.auto:
-        update_packages(outdated, install_args, args.continue_on_fail, args.freeze_outdated_packages)
+        update_packages(
+            outdated, install_args, args.continue_on_fail,
+            args.freeze_outdated_packages, uv=args.uv)
         return
     if args.raw:
         for pkg in outdated:
@@ -324,7 +337,9 @@ def main():
             if answer in ['y', 'a']:
                 selected.append(pkg)
     if selected:
-        update_packages(selected, install_args, args.continue_on_fail, args.freeze_outdated_packages)
+        update_packages(
+            selected, install_args, args.continue_on_fail,
+            args.freeze_outdated_packages, uv=args.uv)
 
 
 if __name__ == '__main__':
