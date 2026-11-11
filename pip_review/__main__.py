@@ -213,13 +213,18 @@ def update_packages(packages, forwarded, continue_on_fail, freeze_outdated_packa
 
     if not continue_on_fail:
         upgrade_cmd += ['{0}'.format(pkg['name']) for pkg in packages]
-        subprocess.call(upgrade_cmd, stdout=sys.stdout, stderr=sys.stderr)
-        return
+        return subprocess.call(upgrade_cmd, stdout=sys.stdout,
+                               stderr=sys.stderr)
 
+    result = 0
     for pkg in packages:
         upgrade_cmd += ['{0}'.format(pkg['name'])]
-        subprocess.call(upgrade_cmd, stdout=sys.stdout, stderr=sys.stderr)
+        status = subprocess.call(upgrade_cmd, stdout=sys.stdout,
+                                 stderr=sys.stderr)
+        if status and not result:
+            result = status
         upgrade_cmd.pop()
+    return result
 
 
 def confirm(question):
@@ -307,8 +312,8 @@ def main():
         if args.preview_only:
             return
     if args.auto:
-        update_packages(outdated, install_args, args.continue_on_fail, args.freeze_outdated_packages)
-        return
+        return update_packages(outdated, install_args, args.continue_on_fail,
+                               args.freeze_outdated_packages)
     if args.raw:
         for pkg in outdated:
             logger.info('{0}=={1}'.format(pkg['name'], pkg['latest_version']))
@@ -324,12 +329,13 @@ def main():
             if answer in ['y', 'a']:
                 selected.append(pkg)
     if selected:
-        update_packages(selected, install_args, args.continue_on_fail, args.freeze_outdated_packages)
+        return update_packages(selected, install_args, args.continue_on_fail,
+                               args.freeze_outdated_packages)
 
 
 if __name__ == '__main__':
     try:
-        main()
+        sys.exit(main())
     except KeyboardInterrupt:
         sys.stdout.write('\nAborted\n')
         sys.exit(0)

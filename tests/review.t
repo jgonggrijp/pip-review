@@ -106,3 +106,67 @@ Next, let's test for regressions with older versions of pip:
 Cleanup our playground:
 
   $ rm -rf FOO
+
+Failed upgrades must produce a failing exit status. Use an offline pip
+fixture so that no installed packages need to be changed:
+
+  $ python - <<'PY'
+  > import os
+  > import shutil
+  > import subprocess
+  > import sys
+  > import tempfile
+  >
+  > directory = tempfile.mkdtemp()
+  > try:
+  >     pip_dir = os.path.join(directory, 'pip')
+  >     os.mkdir(pip_dir)
+  >     with open(os.path.join(pip_dir, '__init__.py'), 'w') as f:
+  >         f.write("__version__ = '25.0'\n")
+  >     with open(os.path.join(pip_dir, '__main__.py'), 'w') as f:
+  >         f.write('''import json, os, sys
+  > if sys.argv[1] == 'list':
+  >     print(json.dumps([
+  >         dict(name=name, version='1', latest_version='2')
+  >         for name in ['alpha', 'beta']]))
+  > else:
+  >     with open(os.environ['INSTALL_LOG'], 'a') as log:
+  >         log.write(' '.join(sys.argv[3:]) + '\\n')
+  >     sys.exit(7 if 'alpha' in sys.argv and
+  >              os.environ.get('FAIL_UPGRADE') == '1' else 0)
+  > ''')
+  >     env = os.environ.copy()
+  >     env['PYTHONPATH'] = os.pathsep.join([
+  >         directory, os.path.dirname(os.environ['TESTDIR'])])
+  >     env['INSTALL_LOG'] = os.path.join(directory, 'install.log')
+  >     for entry in [
+  >         ['-m', 'pip_review'],
+  >         ['-c', 'import sys; from pip_review.__main__ import main; '
+  >                'sys.exit(main())'],
+  >     ]:
+  >         for flags, answers in [
+  >             (['--auto'], None),
+  >             (['--auto', '--continue-on-fail'], None),
+  >             (['--interactive'], b'y\ny\n'),
+  >         ]:
+  >             for failure, expected in [('1', 7), ('0', 0)]:
+  >                 env['FAIL_UPGRADE'] = failure
+  >                 with open(env['INSTALL_LOG'], 'w'):
+  >                     pass
+  >                 process = subprocess.Popen(
+  >                     [sys.executable] + entry + flags,
+  >                     cwd=directory, env=env, stdin=subprocess.PIPE,
+  >                     stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+  >                 stdout, stderr = process.communicate(answers)
+  >                 assert process.returncode == expected, (
+  >                     entry, flags, failure, process.returncode,
+  >                     stdout, stderr)
+  >                 if '--continue-on-fail' in flags:
+  >                     with open(env['INSTALL_LOG']) as log:
+  >                         assert log.read().splitlines() == [
+  >                             'alpha', 'beta']
+  >     print('12 exit-status cases passed')
+  > finally:
+  >     shutil.rmtree(directory)
+  > PY
+  12 exit-status cases passed
