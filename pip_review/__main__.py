@@ -34,7 +34,7 @@ VERSION_PATTERN = re.compile(
     re.VERBOSE | re.IGNORECASE,  # necessary according to the `packaging` docs
 )
 
-NAME_PATTERN = re.compile(r'[a-z0-9_-]+', re.IGNORECASE)
+NAME_PATTERN = re.compile(r'[a-z0-9._-]+', re.IGNORECASE)
 
 EPILOG = '''
 Unrecognised arguments will be forwarded to pip list --outdated and
