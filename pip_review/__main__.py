@@ -28,6 +28,11 @@ else:  # Python2 Imports
     import __builtin__
     input = getattr(__builtin__, 'raw_input')
 
+try:
+    from urllib.request import urlopen
+except ImportError:  # Python 2
+    from urllib2 import urlopen
+
 
 VERSION_PATTERN = re.compile(
     version.VERSION_PATTERN,
@@ -82,6 +87,17 @@ COLUMNS = {
     'Type': 'latest_filetype',
 }
 
+# where --changelog looks up the project URLs of a release
+PYPI_JSON_URL = 'https://pypi.org/pypi/{0}/{1}/json'
+
+# project URL labels that point to a changelog, best match first. Labels are
+# compared in lower case with everything but letters removed, so
+# "Change Log", "change-log" and "Changelog" are all the same.
+CHANGELOG_LABELS = (
+    'changelog', 'changes', 'releasenotes', 'history', 'whatsnew', 'news',
+    'releases',
+)
+
 # version-specific information to be add to the help page
 VERSION_EPILOG = DEPRECATED_NOTICE if (2, 7) > sys.version_info >= (3, 3) else ''
 
@@ -123,6 +139,9 @@ def parse_args():
     parser.add_argument(
         '--preview-only', '-P', action='store_true', default=False,
         help='Preview only')
+    parser.add_argument(
+        '--changelog', action='store_true', default=False,
+        help='Show a link to the changelog of each update, looked up on PyPI')
     return parser.parse_known_args()
 
 
@@ -289,6 +308,38 @@ def format_table(columns):
     return '\n'.join([head, ruler] + body + [ruler])
 
 
+def changelog_url(project_urls):
+    """ Return the changelog link among `project_urls`, or None. """
+    links = {}
+    for label, url in (project_urls or {}).items():
+        key = re.sub('[^a-z]', '', label.lower())
+        links.setdefault(key, url)
+    for label in CHANGELOG_LABELS:
+        if links.get(label):
+            return links[label]
+    return None
+
+
+def get_changelog_url(name, release, timeout=10):
+    """ Look up the changelog link of a release on PyPI.
+
+    Returns None when the release has no changelog link or PyPI can't be
+    reached, so a missing link never stops pip-review.
+    """
+    url = PYPI_JSON_URL.format(name, release)
+    try:
+        response = urlopen(url, timeout=timeout)
+        try:
+            data = json.loads(response.read().decode('utf-8'))
+        finally:
+            response.close()
+        return changelog_url(data['info'].get('project_urls'))
+    except Exception as error:
+        logging.getLogger(u'pip-review').debug(
+            'Could not look up the changelog of {0}: {1}'.format(name, error))
+        return None
+
+
 def main():
     args, forwarded = parse_args()
     list_args = filter_forwards(forwarded, INSTALL_ONLY)
@@ -319,6 +370,10 @@ def main():
         logger.info('{0}=={1} is available (you have {2})'.format(
             pkg['name'], pkg['latest_version'], pkg['version']
         ))
+        if args.changelog:
+            url = get_changelog_url(pkg['name'], pkg['latest_version'])
+            if url:
+                logger.info('  changelog: {0}'.format(url))
         if args.interactive:
             answer = ask_to_install()
             if answer in ['y', 'a']:
