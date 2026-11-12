@@ -99,30 +99,62 @@ def parse_args():
         epilog=EPILOG + VERSION_EPILOG,
         **kwargs
     )
+
+# ----------------------------
+
     parser.add_argument(
         '--verbose', '-v', action='store_true', default=False,
         help='Show more output')
+
+    ''' example:
+    ezdxf==1.0.2 is available (you have 0.8.0)
+    pip==23.0.1 is available (you have 22.0.4)
+    setuptools==67.3.2 is available (you have 58.1.0)
+    '''
+
     parser.add_argument(
         '--raw', '-r', action='store_true', default=False,
         help='Print raw lines (suitable for passing to pip install)')
+
+    ''' example:
+    ezdxf==1.0.2
+    pip==23.0.1
+    setuptools==67.3.2
+    '''
+
     parser.add_argument(
         '--interactive', '-i', action='store_true', default=False,
         help='Ask interactively to install updates')
+
     parser.add_argument(
         '--auto', '-a', action='store_true', default=False,
         help='Automatically install every update found')
+
     parser.add_argument(
         '--continue-on-fail', '-C', action='store_true', default=False,
         help='Continue with other installs when one fails')
+
     parser.add_argument(
         '--freeze-outdated-packages', action='store_true', default=False,
         help='Freeze all outdated packages to "requirements.txt" before upgrading them')
+
     parser.add_argument(
         '--preview', '-p', action='store_true', default=False,
         help='Preview update target list before execution')
+
+    ''' exmple:
+    Package    Version Latest Type 
+    -------------------------------
+    ezdxf      0.8.0   1.0.2  wheel
+    pip        22.0.4  23.0.1 wheel
+    setuptools 58.1.0  67.3.2 wheel
+    -------------------------------
+    '''
+
     parser.add_argument(
-        '--preview-only', '-P', action='store_true', default=False,
-        help='Preview only')
+        '--visual', '-s', action='store_true', default=False,
+        help='Interactively select the packages for update, see a visual report and do the updates')
+
     return parser.parse_known_args()
 
 
@@ -294,38 +326,88 @@ def main():
     list_args = filter_forwards(forwarded, INSTALL_ONLY)
     install_args = filter_forwards(forwarded, LIST_ONLY)
     logger = setup_logging(args.verbose)
+    outdated = get_outdated_packages(list_args)
+
+# --verbose
+    if args.verbose:
+        for pkg in outdated:
+            logger.info('{0}=={1} is available (you have {2})'.format(
+                pkg['name'], pkg['latest_version'], pkg['version']
+            ))
+
+# --raw
+# --interactive
 
     if args.raw and args.interactive:
         raise SystemExit('--raw and --interactive cannot be used together')
 
-    outdated = get_outdated_packages(list_args)
     if not outdated and not args.raw:
         logger.info('Everything up-to-date')
         return
-    if args.preview or args.preview_only:
-        logger.info(format_table(extract_table(outdated)))
-        if args.preview_only:
-            return
-    if args.auto:
-        update_packages(outdated, install_args, args.continue_on_fail, args.freeze_outdated_packages)
-        return
+
+# --raw
     if args.raw:
         for pkg in outdated:
             logger.info('{0}=={1}'.format(pkg['name'], pkg['latest_version']))
         return
 
-    selected = []
-    for pkg in outdated:
-        logger.info('{0}=={1} is available (you have {2})'.format(
-            pkg['name'], pkg['latest_version'], pkg['version']
-        ))
-        if args.interactive:
+# --interactive
+    if args.interactive:
+        selected = []
+
+        for pkg in outdated:
+            logger.info('{0}=={1} is available (you have {2})'.format(
+                pkg['name'], pkg['latest_version'], pkg['version']
+            ))
+
             answer = ask_to_install()
+
             if answer in ['y', 'a']:
                 selected.append(pkg)
-    if selected:
-        update_packages(selected, install_args, args.continue_on_fail, args.freeze_outdated_packages)
 
+        if selected:
+            update_packages(selected, install_args, args.continue_on_fail, args.freeze_outdated_packages)
+
+# --auto
+    if args.auto:
+        update_packages(outdated, install_args, args.continue_on_fail, args.freeze_outdated_packages)
+        return
+
+# --preview
+    if args.preview:
+        logger.info(format_table(extract_table(outdated)))
+
+# --preview-only
+    if args.visual:
+        selected = []
+
+        for pkg in outdated:
+            logger.info('{0}=={1} is available (you have {2})'.format(
+                pkg['name'], pkg['latest_version'], pkg['version']
+            ))
+
+            answer = ask_to_install()
+
+            if answer in ['y', 'a']:
+                selected.append(pkg)
+
+        if not selected:
+            logger.info('No packages selected for update / upgrade')
+            return
+
+        if selected:
+            logger.info('Selected packages for update / upgrade are')
+            logger.info(format_table(extract_table(selected)))
+
+            answer = ask_to_install()
+
+            if answer in ['y', 'a']:
+                update_packages(selected, install_args, args.continue_on_fail, args.freeze_outdated_packages)
+            
+            else:
+                logger.info('You chose to quit the update process')
+
+        return
 
 if __name__ == '__main__':
     try:

@@ -57,7 +57,7 @@ Example, preview for update target list by ``pip list --outdated`` format, with 
     $ pip-review --auto --preview
     ... <same above and pip install output>
 
-Example, only preview for update target list:
+Example, preview a table of the update target list, which is a combination of the interactive and preview formats:
 
 .. code:: console
 
