@@ -94,7 +94,7 @@ Alternatively, this option can be specified in ``pip.conf``, e.g.:
     $ cat ~/.config/pip/pip.conf
     [global]
     constraint = /home/username/constraints.txt
-    
+
 * Windows:
 
 .. code:: console
@@ -140,6 +140,14 @@ To test under all (supported) Python versions:
 .. code:: console
 
     $ tox
+
+*Or*, if you have Podman or Docker installed:
+
+.. code:: console
+
+    $ docker compose up    # (or podman compose up)
+    $ # wait for all tests to complete
+    $ docker compose down  # (or podman compose down)
 
 The tests run quite slow, since they actually interact with PyPI, which
 involves downloading packages, etc.  So please be patient.
