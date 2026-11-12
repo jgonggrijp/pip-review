@@ -344,6 +344,7 @@ FLAGS = {
     'preview': '-p',
     'preview_only': '-P',
     'freeze_outdated_packages': '--freeze-outdated-packages',
+    'changelog': '--changelog',
 }
 
 
@@ -366,6 +367,70 @@ def test_unknown_options_are_forwarded(parse):
     args, forwarded = parse('--user', '--auto', '--timeout', '30')
     assert args.auto
     assert forwarded == ['--user', '--timeout', '30']
+
+
+# changelog
+
+@pytest.mark.parametrize('label', [
+    'Changelog', 'Change Log', 'change-log', 'CHANGES', 'Release Notes',
+    'History', "What's New", 'News', 'Releases',
+])
+def test_changelog_url_label_variants(label):
+    urls = {'Homepage': 'https://example.org', label: 'https://cl.example'}
+    assert pr.changelog_url(urls) == 'https://cl.example'
+
+
+def test_changelog_url_prefers_the_best_label():
+    urls = {
+        'Releases': 'https://releases.example',
+        'Changelog': 'https://changelog.example',
+        'History': 'https://history.example',
+    }
+    assert pr.changelog_url(urls) == 'https://changelog.example'
+
+
+@pytest.mark.parametrize('urls', [None, {}, {'Source': 'https://src.example'}])
+def test_changelog_url_none(urls):
+    assert pr.changelog_url(urls) is None
+
+
+class FakeResponse(object):
+    def __init__(self, body):
+        self.body = body
+        self.closed = False
+
+    def read(self):
+        return self.body
+
+    def close(self):
+        self.closed = True
+
+
+def test_get_changelog_url_reads_pypi(mocker):
+    response = FakeResponse(
+        b'{"info": {"project_urls": {"Changelog": "https://cl.example"}}}')
+    urlopen = mocker.patch.object(pr, 'urlopen', return_value=response)
+    assert pr.get_changelog_url('alpha', '2.0') == 'https://cl.example'
+    urlopen.assert_called_once_with(
+        'https://pypi.org/pypi/alpha/2.0/json', timeout=10)
+    assert response.closed
+
+
+def test_get_changelog_url_without_project_urls(mocker):
+    mocker.patch.object(pr, 'urlopen', return_value=FakeResponse(
+        b'{"info": {"project_urls": null}}'))
+    assert pr.get_changelog_url('alpha', '2.0') is None
+
+
+@pytest.mark.parametrize('error', [IOError('offline'), ValueError('bad')])
+def test_get_changelog_url_errors_are_not_fatal(mocker, error):
+    mocker.patch.object(pr, 'urlopen', side_effect=error)
+    assert pr.get_changelog_url('alpha', '2.0') is None
+
+
+def test_get_changelog_url_bad_json_is_not_fatal(mocker):
+    mocker.patch.object(pr, 'urlopen', return_value=FakeResponse(b'<html>'))
+    assert pr.get_changelog_url('alpha', '2.0') is None
 
 
 # main
@@ -475,3 +540,29 @@ def test_main_interactive_answer_all(run_main):
 def test_main_interactive_nothing_selected(run_main):
     result = run_main('-i', answers=['n', 'q'])
     result.update.assert_not_called()
+
+
+def test_main_changelog_lists_links(run_main, mocker):
+    lookup = mocker.patch.object(pr, 'get_changelog_url', side_effect=[
+        'https://cl.example/alpha', None])
+    result = run_main('--changelog')
+    assert result.lines == [
+        'alpha==2.0 is available (you have 1.0)',
+        '  changelog: https://cl.example/alpha',
+        'beta-longer==0.2 is available (you have 0.1.dev1)',
+    ]
+    assert lookup.call_args_list == [
+        mocker.call('alpha', '2.0'), mocker.call('beta-longer', '0.2')]
+
+
+def test_main_without_changelog_does_no_lookups(run_main, mocker):
+    lookup = mocker.patch.object(pr, 'get_changelog_url')
+    run_main('-i', answers=['n', 'n'])
+    lookup.assert_not_called()
+
+
+def test_main_raw_ignores_changelog(run_main, mocker):
+    lookup = mocker.patch.object(pr, 'get_changelog_url')
+    result = run_main('--raw', '--changelog')
+    assert result.lines == ['alpha==2.0', 'beta-longer==0.2']
+    lookup.assert_not_called()

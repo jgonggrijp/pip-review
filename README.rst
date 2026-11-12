@@ -69,6 +69,19 @@ Example, only preview for update target list:
     rq       0.3.0   0.3.4  wheel
     -----------------------------
 
+Example, show where to read about each update before you install it:
+
+.. code:: console
+
+    $ pip-review --interactive --changelog
+    requests==0.14.0 is available (you have 0.13.2)
+      changelog: https://github.com/psf/requests/blob/main/HISTORY.md
+    Upgrade now? [Y]es, [N]o, [A]ll, [Q]uit
+
+The link comes from the project URLs of the new release on PyPI, so packages
+that don't publish a changelog link get no extra line. This sends the names of
+your outdated packages to PyPI, even if you install from a different index.
+
 Run ``pip-review -h`` for a complete overview of the options.
 
 Note: If you want to pin specific packages to prevent them from automatically
